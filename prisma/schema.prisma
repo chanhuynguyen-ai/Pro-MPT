@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+model User {
+  id           String               @id @default(cuid())
+  name         String
+  username     String               @unique
+  email        String               @unique
+  passwordHash String?
+  avatarUrl    String?
+  bio          String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  repositories Repository[]
+  versions     RepositoryVersion[]  @relation("VersionAuthor")
+  stars        Star[]
+  clones       Clone[]
+  downloads    Download[]
+}
+
+model Category {
+  id           String       @id @default(cuid())
+  name         String       @unique
+  slug         String       @unique
+  description  String?
+  repositories Repository[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Repository {
+  id              String              @id @default(cuid())
+  ownerId         String
+  categoryId      String?
+  name            String
+  slug            String
+  description     String
+  visibility      Visibility          @default(PUBLIC)
+  latestVersionId String?
+  starsCount      Int                 @default(0)
+  clonesCount     Int                 @default(0)
+  downloadsCount  Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  owner           User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  category        Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  versions        RepositoryVersion[]
+  tags            RepositoryTag[]
+  stars           Star[]
+  sourceClones    Clone[]             @relation("SourceRepository")
+  targetClones    Clone[]             @relation("TargetRepository")
+  downloads       Download[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId])
+  @@index([categoryId])
+  @@index([visibility])
+}
+
+model RepositoryVersion {
+  id                String      @id @default(cuid())
+  repositoryId      String
+  createdById       String
+  versionNumber     String
+  title             String
+  shortDescription  String?
+  systemPrompt      String
+  userPromptTemplate String
+  variablesJson     String
+  outputFormat      String?
+  notes             String?
+  changelog         String?
+  isLatest          Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+
+  repository        Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdBy         User        @relation("VersionAuthor", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, versionNumber])
+  @@index([repositoryId, isLatest])
+}
+
+model Tag {
+  id           String          @id @default(cuid())
+  name         String          @unique
+  slug         String          @unique
+  repositories RepositoryTag[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model RepositoryTag {
+  id           String       @id @default(cuid())
+  repositoryId String
+  tagId        String
+
+  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  tag          Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, tagId])
+  @@index([tagId])
+}
+
+model Star {
+  id           String      @id @default(cuid())
+  userId       String
+  repositoryId String
+  createdAt    DateTime    @default(now())
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repositoryId])
+  @@index([repositoryId])
+}
+
+model Clone {
+  id                  String      @id @default(cuid())
+  userId              String
+  sourceRepositoryId  String
+  targetRepositoryId  String
+  createdAt           DateTime    @default(now())
+
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceRepository    Repository  @relation("SourceRepository", fields: [sourceRepositoryId], references: [id], onDelete: Cascade)
+  targetRepository    Repository  @relation("TargetRepository", fields: [targetRepositoryId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sourceRepositoryId])
+  @@index([targetRepositoryId])
+}
+
+model Download {
+  id           String      @id @default(cuid())
+  repositoryId String
+  userId       String?
+  format       String
+  createdAt    DateTime    @default(now())
+
+  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([repositoryId])
+  @@index([userId])
+}
