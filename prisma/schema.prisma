@@ -12,85 +12,153 @@ enum Visibility {
   PRIVATE
 }
 
-model User {
-  id           String               @id @default(cuid())
-  name         String
-  username     String               @unique
-  email        String               @unique
-  passwordHash String?
-  avatarUrl    String?
-  bio          String?
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+enum CompatibilityTarget {
+  ALL_MODELS
+  CHATGPT
+  CLAUDE
+  CLAUDE_CODE
+  GEMINI
+}
 
-  repositories Repository[]
-  versions     RepositoryVersion[]  @relation("VersionAuthor")
-  stars        Star[]
-  clones       Clone[]
-  downloads    Download[]
+enum RepositorySourceMode {
+  MANUAL
+  UPLOAD_BUNDLE
+}
+
+model User {
+  id              String              @id @default(cuid())
+  name            String
+  username        String              @unique
+  email           String              @unique
+  passwordHash    String?
+  avatarUrl       String?
+  bio             String?
+  repositories    Repository[]
+  versionAuthors  RepositoryVersion[] @relation("VersionAuthor")
+  stars           Star[]
+  cloneEvents     Clone[]             @relation("CloneActor")
+  downloads       Download[]
+  sessions        Session[]
+  workspaces      Workspace[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Category {
   id           String       @id @default(cuid())
   name         String       @unique
   slug         String       @unique
-  description  String?
   repositories Repository[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
 
 model Repository {
-  id              String              @id @default(cuid())
-  ownerId         String
-  categoryId      String?
-  name            String
-  slug            String
-  description     String
-  visibility      Visibility          @default(PUBLIC)
-  latestVersionId String?
-  starsCount      Int                 @default(0)
-  clonesCount     Int                 @default(0)
-  downloadsCount  Int                 @default(0)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-
-  owner           User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  category        Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  versions        RepositoryVersion[]
-  tags            RepositoryTag[]
-  stars           Star[]
-  sourceClones    Clone[]             @relation("SourceRepository")
-  targetClones    Clone[]             @relation("TargetRepository")
-  downloads       Download[]
+  id                String                     @id @default(cuid())
+  ownerId           String
+  categoryId        String
+  name              String
+  slug              String
+  description       String
+  customModelNamesJson String?
+  visibility        Visibility                 @default(PUBLIC)
+  sourceMode        RepositorySourceMode       @default(MANUAL)
+  latestVersionId   String?                    @unique
+  starsCount        Int                        @default(0)
+  clonesCount       Int                        @default(0)
+  downloadsCount    Int                        @default(0)
+  owner             User                       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  category          Category                   @relation(fields: [categoryId], references: [id])
+  versions          RepositoryVersion[]        @relation("RepositoryVersions")
+  latestVersion     RepositoryVersion?         @relation("LatestRepositoryVersion", fields: [latestVersionId], references: [id])
+  tags              RepositoryTag[]
+  compatibility     RepositoryCompatibility[]
+  assets            RepositoryAsset[]
+  chunks            RepositoryChunk[]
+  stars             Star[]
+  sourceClones      Clone[]                    @relation("SourceRepository")
+  derivedClones     Clone[]                    @relation("ClonedRepository")
+  downloads         Download[]
+  workspaceLinks    WorkspaceRepository[]
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
 
   @@unique([ownerId, slug])
-  @@index([ownerId])
   @@index([categoryId])
-  @@index([visibility])
 }
 
 model RepositoryVersion {
-  id                String      @id @default(cuid())
-  repositoryId      String
-  createdById       String
-  versionNumber     String
-  title             String
-  shortDescription  String?
-  systemPrompt      String
+  id                 String      @id @default(cuid())
+  repositoryId       String
+  createdById        String
+  versionNumber      String
+  title              String
+  shortDescription   String
+  systemPrompt       String
   userPromptTemplate String
-  variablesJson     String
-  outputFormat      String?
-  notes             String?
-  changelog         String?
-  isLatest          Boolean     @default(false)
-  createdAt         DateTime    @default(now())
-
-  repository        Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  createdBy         User        @relation("VersionAuthor", fields: [createdById], references: [id], onDelete: Cascade)
+  variablesJson      String
+  outputFormat       String
+  notes              String?
+  changelog          String
+  isLatest           Boolean     @default(false)
+  repository         Repository  @relation("RepositoryVersions", fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdBy          User        @relation("VersionAuthor", fields: [createdById], references: [id])
+  selectedByLatestOf Repository? @relation("LatestRepositoryVersion")
+  chunks             RepositoryChunk[]
+  createdAt          DateTime    @default(now())
 
   @@unique([repositoryId, versionNumber])
-  @@index([repositoryId, isLatest])
+  @@index([repositoryId, createdAt])
+}
+
+model RepositoryAsset {
+  id           String            @id @default(cuid())
+  repositoryId String
+  originalName String
+  relativePath String?
+  storagePath  String
+  mimeType     String?
+  sizeBytes    Int
+  isText       Boolean           @default(false)
+  previewText  String?
+  repository   Repository        @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  chunks       RepositoryChunk[]
+  createdAt    DateTime          @default(now())
+
+  @@index([repositoryId])
+}
+
+model RepositoryChunk {
+  id           String             @id @default(cuid())
+  repositoryId String
+  assetId      String?
+  versionId    String?
+  sourceType   String
+  title        String
+  content      String
+  contentHash  String
+  embeddingJson String?
+  repository   Repository         @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  asset        RepositoryAsset?   @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  version      RepositoryVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([repositoryId])
+  @@index([assetId])
+  @@index([versionId])
 }
 
 model Tag {
@@ -99,59 +167,88 @@ model Tag {
   slug         String          @unique
   repositories RepositoryTag[]
   createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
 }
 
 model RepositoryTag {
-  id           String       @id @default(cuid())
   repositoryId String
   tagId        String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  tag          Tag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  tag          Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@unique([repositoryId, tagId])
+  @@id([repositoryId, tagId])
   @@index([tagId])
 }
 
+model RepositoryCompatibility {
+  repositoryId String
+  target       CompatibilityTarget
+  repository   Repository          @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@id([repositoryId, target])
+  @@index([target])
+}
+
+
+model Workspace {
+  id          String                @id @default(cuid())
+  ownerId     String
+  name        String
+  description String?
+  owner       User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  items       WorkspaceRepository[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([ownerId])
+  @@unique([ownerId, name])
+}
+
+model WorkspaceRepository {
+  workspaceId  String
+  repositoryId String
+  workspace    Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  addedAt      DateTime    @default(now())
+
+  @@id([workspaceId, repositoryId])
+  @@index([repositoryId])
+}
+
 model Star {
-  id           String      @id @default(cuid())
+  id           String     @id @default(cuid())
   userId       String
   repositoryId String
-  createdAt    DateTime    @default(now())
-
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
 
   @@unique([userId, repositoryId])
   @@index([repositoryId])
 }
 
 model Clone {
-  id                  String      @id @default(cuid())
-  userId              String
-  sourceRepositoryId  String
-  targetRepositoryId  String
-  createdAt           DateTime    @default(now())
+  id                 String     @id @default(cuid())
+  sourceRepositoryId String
+  clonedRepositoryId String
+  userId             String
+  sourceRepository   Repository @relation("SourceRepository", fields: [sourceRepositoryId], references: [id], onDelete: Cascade)
+  clonedRepository   Repository @relation("ClonedRepository", fields: [clonedRepositoryId], references: [id], onDelete: Cascade)
+  user               User       @relation("CloneActor", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime   @default(now())
 
-  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceRepository    Repository  @relation("SourceRepository", fields: [sourceRepositoryId], references: [id], onDelete: Cascade)
-  targetRepository    Repository  @relation("TargetRepository", fields: [targetRepositoryId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
   @@index([sourceRepositoryId])
-  @@index([targetRepositoryId])
+  @@index([clonedRepositoryId])
+  @@index([userId])
 }
 
 model Download {
-  id           String      @id @default(cuid())
+  id           String     @id @default(cuid())
   repositoryId String
   userId       String?
   format       String
-  createdAt    DateTime    @default(now())
-
-  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
 
   @@index([repositoryId])
   @@index([userId])

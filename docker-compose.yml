@@ -1,0 +1,17 @@
+services:
+  prompt-hub:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "file:./dev.db"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      STORAGE_DRIVER: "local"
+      STORAGE_ROOT_DIR: "/app/storage/repository-assets"
+      OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+    volumes:
+      - prompt_hub_storage:/app/storage
+      - prompt_hub_db:/app/prisma
+volumes:
+  prompt_hub_storage:
+  prompt_hub_db:

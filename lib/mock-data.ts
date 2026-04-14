@@ -9,6 +9,8 @@ export type RepositoryVersion = {
   notes: string;
 };
 
+export type SupportedModel = 'All models' | 'ChatGPT' | 'Claude' | 'Claude Code' | 'Gemini';
+
 export type Repository = {
   id: string;
   owner: string;
@@ -17,6 +19,7 @@ export type Repository = {
   slug: string;
   description: string;
   category: string;
+  supportedModels: SupportedModel[];
   tags: string[];
   visibility: 'public' | 'private';
   stars: number;
@@ -35,6 +38,7 @@ export const repositories: Repository[] = [
     slug: 'teacher-assistant-vn',
     description: 'Prompt skill cho trợ lý dạy học tiếng Việt với giọng điệu rõ ràng, có ví dụ và cấu trúc đầu ra ổn định.',
     category: 'Education',
+    supportedModels: ['ChatGPT', 'Claude', 'Gemini'],
     tags: ['teaching', 'vietnamese', 'lesson-plan', 'kids'],
     visibility: 'public',
     stars: 128,
@@ -72,6 +76,7 @@ export const repositories: Repository[] = [
     slug: 'api-architect',
     description: 'Prompt skill cho thiết kế backend, API contracts, task breakdown và chuẩn repo theo hơi hướng GitHub issues.',
     category: 'Development',
+    supportedModels: ['Claude Code', 'Claude', 'ChatGPT'],
     tags: ['backend', 'api', 'nodejs', 'architecture'],
     visibility: 'public',
     stars: 264,
@@ -109,6 +114,7 @@ export const repositories: Repository[] = [
     slug: 'meal-planner-fast',
     description: 'Bộ prompt hỗ trợ lên thực đơn, gợi ý nguyên liệu thay thế và tối ưu thời gian nấu ăn.',
     category: 'Cooking',
+    supportedModels: ['All models'],
     tags: ['meal-plan', 'cooking', 'budget', 'healthy'],
     visibility: 'public',
     stars: 76,
@@ -128,9 +134,38 @@ export const repositories: Repository[] = [
       },
     ],
   },
+  {
+    id: 'repo_4',
+    owner: 'maiops',
+    ownerDisplayName: 'Mai Pham',
+    name: 'support-triage-copilot',
+    slug: 'support-triage-copilot',
+    description: 'Prompt repo cho phân loại ticket, tạo response draft và escalation summary cho đội chăm sóc khách hàng.',
+    category: 'Customer Support',
+    supportedModels: ['ChatGPT', 'Gemini'],
+    tags: ['support', 'triage', 'tickets', 'operations'],
+    visibility: 'public',
+    stars: 91,
+    clones: 27,
+    downloads: 54,
+    updatedAt: '2026-04-12',
+    versions: [
+      {
+        version: '1.2.0',
+        changelog: 'Bổ sung output schema cho escalation summary và CSAT recovery cases.',
+        updatedAt: '2026-04-12',
+        systemPrompt: 'You are a customer support operations assistant. Classify tickets, assess urgency, and draft calm, actionable responses.',
+        userTemplate: 'Triage the following ticket for {{product}}. Priority policy: {{policy}}. Customer message: {{ticket}}.',
+        variables: ['product', 'policy', 'ticket'],
+        outputFormat: 'Markdown with sections: Severity, Root Cause Guess, Draft Reply, Escalation Recommendation.',
+        notes: 'Optimized for support inbox review workflows.',
+      },
+    ],
+  },
 ];
 
 export const categories = ['All', 'Development', 'Education', 'Cooking', 'Marketing', 'Customer Support'];
+export const supportedModelOptions: SupportedModel[] = ['All models', 'ChatGPT', 'Claude', 'Claude Code', 'Gemini'];
 
 export function getRepository(owner: string, slug: string) {
   return repositories.find((repo) => repo.owner === owner && repo.slug === slug);

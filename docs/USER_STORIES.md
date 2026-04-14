@@ -1,3 +1,6 @@
+## Implementation note for this starter
+The current codebase already wires US-3, US-4, most of US-5, most of US-6, and most of US-12/US-13 to Prisma + SQLite in demo mode. Authentication, clone, star, download, and publish-new-version remain future build steps.
+
 # Prompt-Hub MVP1 User Stories
 
 ## Epic 1: Authentication
@@ -22,6 +25,7 @@ As a user, I want to create a prompt repository so that I can store a prompt ski
 
 **Acceptance criteria**
 - user can enter repository name, description, category, tags, visibility
+- user can select one or more compatible AI targets
 - repository name is unique per owner
 - repository creation generates a slug
 - repository is visible on the repository detail page after creation
@@ -40,6 +44,7 @@ As a user, I want to view a repository page so that I can understand what the pr
 
 **Acceptance criteria**
 - detail page shows repository title, owner, description, category, tags, visibility
+- compatible AI targets are visible near the top of the page
 - latest version content is visible
 - version list is visible
 - usage stats are visible
@@ -49,8 +54,9 @@ As a user, I want to browse public repositories so that I can discover useful pr
 
 **Acceptance criteria**
 - explore page lists public repositories only
-- user can search by name, description, owner, or tag
+- user can search by name, description, owner, tag, or compatible AI target
 - user can filter by category
+- user can filter by compatible AI target
 - user can sort by latest, most starred, most cloned
 
 ## Epic 4: Versioning
@@ -59,6 +65,7 @@ As a repository owner, I want to publish a new version so that I can track promp
 
 **Acceptance criteria**
 - owner can edit prompt skill content
+- owner can update compatible AI targets when needed
 - owner must provide a changelog
 - new version is saved as a full snapshot
 - latest version is updated
@@ -80,6 +87,7 @@ As a user, I want to clone a public repository so that I can adapt it in my own 
 - clone action is available on public repositories
 - cloned repository belongs to the current user
 - cloned repository preserves latest version content
+- cloned repository preserves compatible AI targets
 - system records a clone event
 
 ### US-10 Download a repository
@@ -88,6 +96,7 @@ As a user, I want to download a repository so that I can use the prompt skill ou
 **Acceptance criteria**
 - download is available from repository detail page
 - user can choose Markdown, JSON, or TXT
+- export includes compatible AI targets in metadata
 - system records a download event
 
 ## Epic 6: Social proof
@@ -107,6 +116,7 @@ As a signed-in user, I want a dashboard so that I can quickly see my repositorie
 - dashboard shows repository count
 - dashboard shows recent repositories
 - dashboard shows basic usage stats
+- dashboard surfaces the compatible AI standard for repositories
 
 ### US-13 View public profile
 As a user, I want a public profile page so that I can view a creator’s repositories.
@@ -114,6 +124,7 @@ As a user, I want a public profile page so that I can view a creator’s reposit
 **Acceptance criteria**
 - public profile lists public repositories for a username
 - repository cards link to repository detail pages
+- cards display compatible AI targets
 
 ## Prioritization
 ### Must have
@@ -127,4 +138,18 @@ As a user, I want a public profile page so that I can view a creator’s reposit
 ## Notes for implementation
 - all write actions should be protected by authentication
 - use full snapshot versioning in MVP1 instead of diffs
+- compatible AI targets should use fixed values in MVP1 for clean filtering and consistent metadata
 - use server-side validation for repository name and slug uniqueness
+
+
+## Share and copy additions
+- repository detail supports share by direct link
+- system prompt and user prompt template each have one-click copy controls
+- full prompt pack can be copied in one action for faster paste into AI tools
+
+
+## Added stories
+- As a user, I can choose web-authored prompt mode or upload-bundle mode when creating a repository.
+- As a user, I can upload prompt files or a zipped skill folder from my machine and store them in the repository.
+- As an owner, I can rename my repository and manage its slug safely.
+- As an owner, I can delete a repository and remove its stored files.
