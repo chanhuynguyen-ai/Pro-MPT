@@ -5,7 +5,7 @@ import { getLanguage } from '@/lib/i18n';
 
 export const metadata: Metadata = {
   title: 'Prompt-Hub MVP1',
-  description: 'GitHub-style MVP starter for managing prompts and prompt skills.',
+  description: 'Git-inspired workspace for managing prompt repositories, knowledge bundles, and grounded AI workflows.',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

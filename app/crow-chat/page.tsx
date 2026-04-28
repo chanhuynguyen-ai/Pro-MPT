@@ -1,6 +1,7 @@
 import { requireUser } from '@/lib/auth';
 import { getDictionary } from '@/lib/i18n';
 import { getOllamaStatus } from '@/lib/ollama';
+import { getUserRemoteLlmConfigs } from '@/lib/remote-llm';
 import { prisma } from '@/lib/prisma';
 import { CrowChatShell } from '@/components/chat/crow-chat-shell';
 import { getWorkspaceOptionsForUser } from '@/lib/workspaces';
@@ -8,7 +9,7 @@ import { getWorkspaceOptionsForUser } from '@/lib/workspaces';
 export default async function CrowChatPage() {
   const user = await requireUser('/crow-chat');
   const { dict } = await getDictionary();
-  const ollama = await getOllamaStatus();
+  const [ollama, remoteConfigs] = await Promise.all([getOllamaStatus(), getUserRemoteLlmConfigs(user.id)]);
 
   const [repositories, starred, workspaces] = await Promise.all([
     prisma.repository.findMany({
@@ -65,8 +66,11 @@ export default async function CrowChatPage() {
     sourceModeLabel: item.repository.sourceMode === 'UPLOAD_BUNDLE' ? 'Uploaded bundle' : 'Web prompt',
   }));
 
-  const installedModels = ollama.installedModels.map((model) => model.name);
-  const defaultMode: 'local' | 'remote' | 'demo' = installedModels.length ? 'local' : process.env.OPENAI_API_KEY ? 'remote' : 'demo';
+  const modelOptions = [
+    ...ollama.installedModels.map((model) => ({ id: `local:${model.name}`, label: `${model.name} • local`, kind: 'local' as const, value: model.name })),
+    ...remoteConfigs.map((config) => ({ id: `api:${config.id}`, label: `${config.label?.trim() || config.model} • api`, kind: 'api' as const, value: config.id })),
+  ];
+  const defaultMode: 'local' | 'remote' | 'demo' = modelOptions.some((item) => item.kind === 'local') ? 'local' : modelOptions.some((item) => item.kind === 'api') ? 'remote' : 'demo';
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
@@ -100,7 +104,7 @@ export default async function CrowChatPage() {
         repoOptions={repoOptions}
         workspaceOptions={workspaces}
         starredRepos={starredRepos}
-        installedModels={installedModels}
+        modelOptions={modelOptions}
         defaultMode={defaultMode}
       />
     </div>

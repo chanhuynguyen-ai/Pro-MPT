@@ -1,5 +1,5 @@
-## Implementation note for this starter
-The current codebase already wires US-3, US-4, most of US-5, most of US-6, and most of US-12/US-13 to Prisma + SQLite in demo mode. Authentication, clone, star, download, and publish-new-version remain future build steps.
+## Implementation note for this real-use build
+The current codebase already wires US-3, US-4, most of US-5, most of US-6, and most of US-12/US-13 to Prisma + SQLite in real mode. Authentication, clone, star, download, and publish-new-version remain future build steps.
 
 # Prompt-Hub MVP1 User Stories
 

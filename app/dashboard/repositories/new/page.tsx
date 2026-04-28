@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CATEGORY_OPTIONS } from '@/lib/constants';
+import { CATEGORY_OPTIONS, REPOSITORY_KIND_OPTIONS } from '@/lib/constants';
 import { requireUser } from '@/lib/auth';
 import { getCreateRepositoryFormData } from '@/lib/repositories';
 import { createRepositoryAction } from '@/app/actions/repository-actions';
@@ -60,7 +60,7 @@ export default async function NewRepositoryPage({
           </div>
           <label className="mt-4 grid gap-2 text-sm text-zinc-300">
             Description
-            <textarea name="description" required className="min-h-24 rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none" placeholder="Describe the purpose, audience, and value of this prompt skill or uploaded bundle." />
+            <textarea name="description" required className="min-h-24 rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none" placeholder="Describe the purpose, audience, and value of this prompt, image prompt, or skill." />
           </label>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <label className="grid gap-2 text-sm text-zinc-300">
@@ -85,6 +85,29 @@ export default async function NewRepositoryPage({
               <input name="tags" className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none" placeholder="backend, api, bundle, docs" />
             </label>
           </div>
+        </section>
+
+        <section className="rounded-2xl border border-zinc-800 bg-black p-5">
+          <h2 className="mb-4 text-lg font-semibold text-white">Explore type</h2>
+          <p className="mb-4 text-sm leading-6 text-zinc-500">Tách repo theo 3 mảng riêng: Prompt text, Prompt image, và Skill. Explore sẽ dùng loại này để chia tab riêng biệt.</p>
+          <div className="grid gap-3 md:grid-cols-3">
+            {REPOSITORY_KIND_OPTIONS.map((option) => (
+              <label key={option.value} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-sm text-zinc-300">
+                <div className="flex items-start gap-3">
+                  <input type="radio" name="kind" value={option.value} defaultChecked={option.value === 'PROMPT_TEXT'} className="mt-1 h-4 w-4" />
+                  <div>
+                    <div className="font-medium text-white">{option.label}</div>
+                    <div className="mt-1 text-xs leading-5 text-zinc-500">{option.description}</div>
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+          <label className="mt-4 grid gap-2 text-sm text-zinc-300">
+            Image style (for Prompt image repos)
+            <input name="imageStyle" className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-white outline-none" placeholder="Cinematic food photography, anime pastel, product render..." />
+          </label>
+          <p className="mt-2 text-xs leading-5 text-zinc-500">Nếu repo là Prompt image, hãy upload ảnh mẫu hoặc ảnh kết quả để Explore và trang chi tiết có thể hiển thị preview gallery.</p>
         </section>
 
         <RepositorySourceModeFields />

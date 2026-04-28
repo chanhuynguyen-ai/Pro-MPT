@@ -1,33 +1,39 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { CATEGORY_OPTIONS } from '@/lib/constants';
+import { CATEGORY_OPTIONS, REPOSITORY_KIND_OPTIONS } from '@/lib/constants';
 import { requireUser } from '@/lib/auth';
 import { getCreateRepositoryFormData, getRepositoryEditorData } from '@/lib/repositories';
 import { deleteRepositoryAction, publishRepositoryVersionAction } from '@/app/actions/repository-actions';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { RepositorySourceModeFields } from '@/components/repository/repository-source-mode-fields';
-import { ModelCompatibilitySelector } from '@/components/repository/model-compatibility-selector';
 import { UploadBundleDropzone } from '@/components/repository/upload-bundle-dropzone';
+import { ModelCompatibilitySelector } from '@/components/repository/model-compatibility-selector';
 
 function getErrorMessage(error?: string) {
   if (!error) return null;
 
   const messages: Record<string, string> = {
-    'missing-required-fields': 'Fill the required repository fields before publishing.',
+    'missing-required-fields': 'Fill the repository basics and changelog before publishing a new version.',
     'missing-manual-prompt-fields': 'Manual mode needs a system prompt, user template, and output format.',
-    'invalid-repository': 'This repository could not be found in your workspace.',
-    'missing-upload-files': 'Upload bundle mode needs at least one file if the repository has no stored bundle yet.',
+    'invalid-repository': 'Repository not found or you do not have access.',
+    'missing-upload-files': 'Upload bundle mode needs at least one file when the repository has no stored bundle yet.',
     'too-many-upload-files': 'The uploaded bundle contains too many files for MVP1. Keep it under 100 files.',
     'bundle-too-large': 'The uploaded bundle is too large for local MVP1 storage. Keep it under 25 MB total.',
-    'delete-confirmation-mismatch': 'Type the exact repository name before deleting it.',
+    'delete-confirmation-mismatch': 'The confirmation text did not match the repository name.',
   };
 
-  return messages[error] ?? 'Something went wrong while updating the repository.';
+  return messages[error] ?? 'Something went wrong while publishing the repository.';
 }
 
-export default async function EditRepositoryPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>>; }) {
+export default async function EditRepositoryPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const user = await requireUser('/dashboard');
   const { id } = await params;
-  const user = await requireUser(`/dashboard/repositories/${id}/edit`);
   const resolved = (await searchParams) ?? {};
   const error = Array.isArray(resolved.error) ? resolved.error[0] : resolved.error;
   const repository = await getRepositoryEditorData(id, user.id);
@@ -67,6 +73,28 @@ export default async function EditRepositoryPage({ params, searchParams }: { par
             <label className="grid gap-2 text-sm text-zinc-300"><span>Visibility</span><select name="visibility" defaultValue={repository.visibility} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none"><option value="PUBLIC">Public</option><option value="PRIVATE">Private</option></select></label>
             <label className="grid gap-2 text-sm text-zinc-300"><span>Tags</span><input name="tags" defaultValue={repository.tags.join(', ')} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none" /></label>
           </div>
+        </section>
+
+        <section className="rounded-2xl border border-zinc-800 bg-black p-5">
+          <h2 className="mb-4 text-lg font-semibold text-white">Explore type</h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            {REPOSITORY_KIND_OPTIONS.map((option) => (
+              <label key={option.value} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-sm text-zinc-300">
+                <div className="flex items-start gap-3">
+                  <input type="radio" name="kind" value={option.value} defaultChecked={repository.kind === option.value} className="mt-1 h-4 w-4" />
+                  <div>
+                    <div className="font-medium text-white">{option.label}</div>
+                    <div className="mt-1 text-xs leading-5 text-zinc-500">{option.description}</div>
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+          <label className="mt-4 grid gap-2 text-sm text-zinc-300">
+            <span>Image style</span>
+            <input name="imageStyle" defaultValue={repository.imageStyle} className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-white outline-none" placeholder="Anime, food photography, flat illustration..." />
+          </label>
+          <p className="mt-2 text-xs leading-5 text-zinc-500">Prompt image repos sẽ dùng trường style này ở thẻ repo, Explore tab và gallery ảnh preview.</p>
         </section>
 
         <RepositorySourceModeFields defaultMode={repository.sourceMode} helpText="You can keep this as a web-authored prompt repo or evolve it into an uploaded bundle repository." />
@@ -109,7 +137,7 @@ export default async function EditRepositoryPage({ params, searchParams }: { par
             {repository.assets.length ? repository.assets.map((asset) => (
               <div key={asset.id} className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-300">
                 <div className="font-medium text-white">{asset.relativePath || asset.originalName}</div>
-                <div className="mt-1 text-xs text-zinc-500">{asset.sizeLabel}{asset.mimeType ? ` • ${asset.mimeType}` : ''}</div>
+                <div className="mt-1 text-xs text-zinc-500">{asset.sizeLabel}{asset.mimeType ? ` • ${asset.mimeType}` : ''}{asset.isImage ? ' • image preview candidate' : ''}</div>
               </div>
             )) : <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950 p-4 text-sm text-zinc-500">No stored files yet. You can upload files here to turn this repo into a bundle-backed repository.</div>}
           </div>

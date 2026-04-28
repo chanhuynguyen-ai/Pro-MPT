@@ -14,6 +14,18 @@ export const SUPPORTED_MODEL_OPTIONS = [
   'Gemini',
 ] as const;
 
+export const REPOSITORY_KIND_OPTIONS = [
+  { value: 'PROMPT_TEXT', label: 'Prompt text', description: 'Prompt chữ dùng để thực hiện nhiệm vụ, trả lời, phân tích, hỗ trợ công việc.' },
+  { value: 'PROMPT_IMAGE', label: 'Prompt image', description: 'Prompt tạo ảnh, có thể kèm style ảnh và ảnh xem trước đã tạo.' },
+  { value: 'SKILL', label: 'Skill', description: 'Tác tử nhiệm vụ chuyên biệt, phù hợp với Claude/chatbot skill workflows.' },
+] as const;
+
+export const REPOSITORY_KIND_LABELS = {
+  PROMPT_TEXT: 'Prompt text',
+  PROMPT_IMAGE: 'Prompt image',
+  SKILL: 'Skill',
+} as const;
+
 export const REPOSITORY_SOURCE_MODES = [
   { value: 'MANUAL', label: 'Write prompts on the web', description: 'Create and store the prompt directly inside Prompt-Hub.' },
   { value: 'UPLOAD_BUNDLE', label: 'Upload files or folder bundle', description: 'Upload a prompt pack, skill folder, notes, docs, or a zipped bundle from your computer.' },

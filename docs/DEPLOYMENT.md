@@ -1,7 +1,7 @@
 # Deployment Guide
 
 ## MVP1 closeout
-This starter now includes:
+This real-use build now includes:
 - pluggable storage abstraction (`lib/storage.ts`)
 - health endpoint (`/api/health`)
 - Dockerfile and docker-compose for local production-like runs
@@ -9,7 +9,7 @@ This starter now includes:
 ## Environment variables
 - `DATABASE_URL`
 - `NEXT_PUBLIC_APP_URL`
-- `STORAGE_DRIVER` (`local` for this starter)
+- `STORAGE_DRIVER` (`local` for this real-use build)
 - `STORAGE_ROOT_DIR`
 - `OLLAMA_BASE_URL`
 - `OPENAI_API_KEY` (optional)

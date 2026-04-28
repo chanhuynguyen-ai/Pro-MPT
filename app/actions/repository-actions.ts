@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { CompatibilityTarget, Prisma, RepositorySourceMode, Visibility } from '@prisma/client';
+import { CompatibilityTarget, Prisma, RepositoryKind, RepositorySourceMode, Visibility } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/lib/utils';
 import { clearRepositoryStorage, readStoredFile, storeUploadedFile } from '@/lib/storage';
 import { rebuildRepositoryIndex } from '@/lib/indexing';
+import { persistRepositorySafetyReview } from '@/lib/safety-review';
 
 
 async function buildUniqueSlug(ownerId: string, baseInput: string, excludeRepositoryId?: string) {
@@ -56,6 +57,12 @@ function resolveCompatibilityTargets(labels: string[]) {
 
 function resolveSourceMode(raw: string) {
   return raw === 'UPLOAD_BUNDLE' ? RepositorySourceMode.UPLOAD_BUNDLE : RepositorySourceMode.MANUAL;
+}
+
+function resolveRepositoryKind(raw: string) {
+  if (raw === 'PROMPT_IMAGE') return RepositoryKind.PROMPT_IMAGE;
+  if (raw === 'SKILL') return RepositoryKind.SKILL;
+  return RepositoryKind.PROMPT_TEXT;
 }
 
 function getUploadedFiles(formData: FormData) {
@@ -167,6 +174,8 @@ export async function createRepositoryAction(formData: FormData) {
   const description = String(formData.get('description') || '').trim();
   const categorySlug = String(formData.get('categorySlug') || '').trim();
   const visibility = String(formData.get('visibility') || 'PUBLIC').trim() === 'PRIVATE' ? Visibility.PRIVATE : Visibility.PUBLIC;
+  const kind = resolveRepositoryKind(String(formData.get('kind') || 'PROMPT_TEXT'));
+  const imageStyle = String(formData.get('imageStyle') || '').trim();
   const sourceMode = resolveSourceMode(String(formData.get('sourceMode') || 'MANUAL'));
   const tags = splitCommaSeparated(String(formData.get('tags') || ''));
   const supportedModels = formData.getAll('supportedModels').map((value) => String(value));
@@ -216,6 +225,8 @@ export async function createRepositoryAction(formData: FormData) {
         name,
         slug,
         description,
+        kind,
+        imageStyle: imageStyle || null,
         customModelNamesJson: JSON.stringify(customModelNames),
         visibility,
         sourceMode,
@@ -254,6 +265,7 @@ export async function createRepositoryAction(formData: FormData) {
     await storeRepositoryAssets(repository.id, uploadedFiles);
   }
   await rebuildRepositoryIndex(repository.id);
+  await persistRepositorySafetyReview(repository.id);
 
   revalidatePath('/');
   revalidatePath('/explore');
@@ -270,6 +282,8 @@ export async function publishRepositoryVersionAction(formData: FormData) {
   const description = String(formData.get('description') || '').trim();
   const categorySlug = String(formData.get('categorySlug') || '').trim();
   const visibility = String(formData.get('visibility') || 'PUBLIC').trim() === 'PRIVATE' ? Visibility.PRIVATE : Visibility.PUBLIC;
+  const kind = resolveRepositoryKind(String(formData.get('kind') || 'PROMPT_TEXT'));
+  const imageStyle = String(formData.get('imageStyle') || '').trim();
   const sourceMode = resolveSourceMode(String(formData.get('sourceMode') || 'MANUAL'));
   const tags = splitCommaSeparated(String(formData.get('tags') || ''));
   const supportedModels = formData.getAll('supportedModels').map((value) => String(value));
@@ -352,6 +366,8 @@ export async function publishRepositoryVersionAction(formData: FormData) {
         name,
         slug: resolvedSlug,
         description,
+        kind,
+        imageStyle: imageStyle || null,
         customModelNamesJson: JSON.stringify(customModelNames),
         categoryId: category.id,
         visibility,
@@ -371,6 +387,7 @@ export async function publishRepositoryVersionAction(formData: FormData) {
     await storeRepositoryAssets(repository.id, uploadedFiles);
   }
   await rebuildRepositoryIndex(repository.id);
+  await persistRepositorySafetyReview(repository.id);
 
   revalidatePath('/');
   revalidatePath('/explore');
@@ -475,6 +492,8 @@ export async function cloneRepositoryAction(formData: FormData) {
         name: cloneName,
         slug: cloneSlug,
         description: `${source.description} (cloned from ${source.owner.username}/${source.slug})`,
+        kind: source.kind,
+        imageStyle: source.imageStyle,
         customModelNamesJson: source.customModelNamesJson,
         visibility: Visibility.PRIVATE,
         sourceMode: source.sourceMode,
@@ -532,6 +551,7 @@ export async function cloneRepositoryAction(formData: FormData) {
     await storeRepositoryAssets(clonedRepository.id, recreatedFiles);
   }
   await rebuildRepositoryIndex(clonedRepository.id);
+  await persistRepositorySafetyReview(clonedRepository.id);
 
   revalidatePath('/dashboard');
   revalidatePath(`/profile/${user.username}`);

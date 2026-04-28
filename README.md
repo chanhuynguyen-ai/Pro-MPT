@@ -1,41 +1,33 @@
-# Prompt-Hub MVP1
+# Prompt-Hub
 
-Prompt-Hub is a GitHub-inspired MVP for storing, versioning, cloning, sharing, exporting, and now **uploading bundle-backed prompt repositories**.
+Prompt-Hub is a Git-inspired workspace for prompt repositories, prompt skill bundles, versioning, retrieval-backed chat, and prompt optimization.
 
-## What this build includes
-- Prisma + SQLite data layer
-- real account auth with cookie sessions
-- repository ownership and private/public visibility
-- create repository in **2 modes**
-  - write prompt directly on the web
-  - upload files / zipped folder bundle from your machine
-- repository bundle file storage on local disk
-- publish new versions
-- rename repository and manage slug safely
-- star / unstar
-- clone repository
-- delete repository
-- download exports (Markdown, JSON, Text)
-- copy buttons for prompt blocks
-- repository sharing link
-- AI compatibility metadata
-- explore search across prompt text and uploaded bundle previews
-- dashboard search and source-mode filtering
-- bundle explorer with live file search and text-only filter
-- grounded repo retrieval for Crow-Chat and repo chat
-- storage abstraction (`local` provider included)
-- health endpoint + Docker deployment starter
-- MVP2 starter: version compare + Prompt Coach
+This package is the **real-use clean build**:
+- no demo users
+- no seeded fake repositories
+- no seeded workspaces
+- sign up with your own account and store your own data
 
-## Tech stack
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- Prisma ORM
-- SQLite
+## What is included
+- Real sign-up / sign-in with session cookies
+- Repository create / edit / delete
+- Manual prompt mode and uploaded bundle mode
+- Stars, clone, downloads, share, copy buttons
+- Crow-Chat with repo library grounding
+- Workspace support
+- Prompt Optimizer
+- Retrieval/indexing pipeline
+- Storage abstraction (`local` now, `s3` ready)
 
-## Local setup
+## Recommended use right now
+For personal use, start with SQLite and local storage. This is already a real database and a real account flow for a single-user or small private setup.
 
+For later production/public deployment, move to:
+- PostgreSQL
+- S3/R2/MinIO object storage
+- proper monitoring and backups
+
+## Quick start
 ```bash
 cp .env.example .env
 npm install
@@ -45,107 +37,58 @@ npm run prisma:seed
 npm run dev
 ```
 
-Open:
+Open `http://localhost:3000`
 
-```text
-http://localhost:3000
+## First-time setup
+1. Open `/sign-up`
+2. Create your real account
+3. Sign in
+4. Open `/dashboard/repositories/new`
+5. Create your first prompt repository
+6. Open `/crow-chat` and choose your repo library
+
+## Environment
+See `.env.example`.
+
+### Personal real-use default
+```env
+DATABASE_URL="file:./dev.db"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+STORAGE_DRIVER="local"
+STORAGE_ROOT_DIR="./storage/repository-assets"
 ```
 
-## Demo login
-All seeded demo accounts use the same password:
-
-```text
-prompt1234
+### Optional remote AI
+```env
+OPENAI_API_KEY=""
+OPENAI_MODEL="gpt-5-mini"
+OPENAI_EMBEDDING_MODEL="text-embedding-3-small"
 ```
 
-Examples:
-- hungdev@example.com
-- alina@example.com
-- chefminh@example.com
-- maiops@example.com
+### Optional Ollama
+```env
+OLLAMA_BASE_URL="http://127.0.0.1:11434"
+OLLAMA_EMBEDDING_MODEL="nomic-embed-text"
+```
 
-## Core routes
-- `/` landing page
-- `/explore` public repository discovery
-- `/sign-in` sign in
-- `/sign-up` create account
-- `/dashboard` authenticated workspace
-- `/dashboard/repositories/new` create repository
-- `/dashboard/repositories/[id]/edit` manage repository, publish version, upload files, delete repository
-- `/repositories/[owner]/[slug]` repository detail with bundle explorer
-- `/repositories/[owner]/[slug]/files/[assetId]` download a stored bundle file
-- `/profile/[username]` profile and repositories
-- `/settings` language and local model settings
-- `/crow-chat` workspace-level chatbot with repo library + model selector
-- `/api/health` healthcheck for database + storage
-- `/repositories/[owner]/[slug]/compare` MVP2 version compare
-- `/repositories/[owner]/[slug]/coach` MVP2 Prompt Coach
+## Database bootstrap
+`npm run prisma:seed` is now **safe for real use**.
+It only creates base categories and does **not** wipe user data.
 
-## Notes
-- private repositories only render for their owner
-- edit page is owner-only
-- clone creates a new private repo in the signed-in user workspace
-- star, clone, create, edit, and delete require sign-in
-- download is allowed for public repos and owner-visible private repos
-- uploaded bundle files are stored locally under `storage/repository-assets`
-- local model management expects Ollama running at `OLLAMA_BASE_URL` (default `http://127.0.0.1:11434`)
-- folder upload depends on browser support; zipped folder upload is the safest fallback in MVP1
+## Real project note
+This build intentionally removes demo accounts and fake repositories so you can use Prompt-Hub with your own real data immediately.
 
-## Final product direction
-Prompt-Hub is being structured so that, after the personal-use version is stable, it can connect to an AI chatbot layer that retrieves prompt bundles and repository files as context for grounded answers. The recommended production direction is:
-1. Prompt-Hub manages repos, versions, permissions, and uploaded knowledge bundles.
-2. A chatbot service indexes repository bundles into a retrieval layer.
-3. The chatbot answers using the selected repo or folder bundle as grounded context.
+## MVP status
+- MVP1: functionally complete for private/personal use
+- MVP2: in progress with Prompt Optimizer, Workspaces, and retrieval-backed Crow-Chat
 
 
-## If you see an `Unknown field `assets`` Prisma error
-Run:
-```powershell
-npm run prisma:generate
+## Clean reset for real use
+If you previously tested demo/sample data, run:
+```bash
+npm run reset:local-data
 npm run prisma:dbpush
 npm run prisma:seed
 ```
-This means your generated Prisma Client is older than the current schema.
 
-
-## Repo chat sandbox
-
-Prompt-Hub now includes a repository-level chat sandbox at `/repositories/[owner]/[slug]/chat`.
-
-- Without `OPENAI_API_KEY`, the sandbox runs in grounded demo mode using the latest prompt version plus uploaded bundle previews.
-- With `OPENAI_API_KEY`, the sandbox calls the OpenAI Responses API and answers using repository-grounded context.
-
-Optional environment variables:
-
-```env
-OPENAI_API_KEY="your_openai_api_key"
-OPENAI_MODEL="gpt-5-mini"
-```
-
-This is the first integration step toward the final goal: a chatbot linked to a specific prompt repo and its uploaded skill bundle.
-
-
-## Docker / deployment starter
-
-```bash
-docker compose up --build
-```
-
-This uses the included `Dockerfile`, `docker-compose.yml`, and the health endpoint at `/api/health`.
-
-See `docs/DEPLOYMENT.md` for notes on moving from local storage to production object storage.
-
-
-## S3-compatible storage and vector retrieval
-
-- Set `STORAGE_DRIVER="s3"` plus the `S3_*` environment variables to store repository bundle files in S3 / R2 / MinIO.
-- Set `OPENAI_API_KEY` + `OPENAI_EMBEDDING_MODEL` or `OLLAMA_EMBEDDING_MODEL` to enable embedding-backed repository indexing.
-- Repo and Crow-Chat retrieval will automatically rebuild or reuse repository chunks from the `RepositoryChunk` table.
-- Owners can rebuild a repo index manually with `POST /api/repositories/[owner]/[slug]/index`.
-
-
-## New in MVP2 starter
-
-- Workspaces: combine multiple repositories into one Crow-Chat library
-- Multi-repo grounded chat: Crow-Chat can answer using a selected workspace or a single repo
-- Starter pages for managing workspace membership and mixing owned + starred repositories
+Then sign up again with your own real account.

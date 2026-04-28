@@ -127,3 +127,11 @@ export async function chatWithOllama(model: string, messages: Array<{ role: 'sys
 
   return typeof payload?.message?.content === 'string' ? payload.message.content : null;
 }
+
+
+export async function deleteLocalModel(model: string) {
+  await fetchOllama('/api/delete', {
+    method: 'DELETE',
+    body: JSON.stringify({ model }),
+  });
+}

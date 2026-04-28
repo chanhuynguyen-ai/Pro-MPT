@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { chatWithOllama } from '@/lib/ollama';
+import { callRemoteLlm, getUserRemoteLlmConfigById } from '@/lib/remote-llm';
 import {
   buildGroundedDemoAnswer,
   buildGroundedPrompt,
@@ -9,24 +10,6 @@ import {
   retrieveRepositoryContext,
   retrieveWorkspaceContext,
 } from '@/lib/retrieval';
-
-function extractResponseText(payload: any) {
-  if (typeof payload?.output_text === 'string' && payload.output_text.trim()) return payload.output_text.trim();
-  if (Array.isArray(payload?.output)) {
-    const fragments: string[] = [];
-    for (const item of payload.output) {
-      if (Array.isArray(item?.content)) {
-        for (const part of item.content) {
-          if (typeof part?.text === 'string') fragments.push(part.text);
-          if (typeof part?.output_text === 'string') fragments.push(part.output_text);
-        }
-      }
-    }
-    const joined = fragments.join('\n').trim();
-    if (joined) return joined;
-  }
-  return null;
-}
 
 export const runtime = 'nodejs';
 
@@ -38,7 +21,8 @@ export async function POST(request: Request) {
   const message = typeof body?.message === 'string' ? body.message.trim() : '';
   const repositoryId = typeof body?.repositoryId === 'string' ? body.repositoryId : '';
   const workspaceId = typeof body?.workspaceId === 'string' ? body.workspaceId : '';
-  const model = typeof body?.model === 'string' ? body.model.trim() : '';
+  const modelKind = typeof body?.modelKind === 'string' ? body.modelKind.trim() : '';
+  const modelValue = typeof body?.modelValue === 'string' ? body.modelValue.trim() : '';
 
   if (!message) return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
 
@@ -62,9 +46,9 @@ export async function POST(request: Request) {
   const citations = groundedWorkspace?.citations ?? groundedRepo?.citations ?? [];
   const retrievalMode = groundedWorkspace?.retrievalMode ?? groundedRepo?.retrievalMode ?? 'lexical';
 
-  if (model) {
+  if (modelKind === 'local' && modelValue) {
     try {
-      const answer = await chatWithOllama(model, [
+      const answer = await chatWithOllama(modelValue, [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: message },
       ]);
@@ -75,22 +59,15 @@ export async function POST(request: Request) {
     }
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  const remoteModel = process.env.OPENAI_MODEL || 'gpt-5-mini';
-  if (apiKey) {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: remoteModel, input: `${systemPrompt}\n\nUser question: ${message}` }),
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      return NextResponse.json({ error: text || 'Remote model request failed.' }, { status: 500 });
+  if (modelKind === 'api' && modelValue) {
+    try {
+      const config = await getUserRemoteLlmConfigById(user.id, modelValue);
+      if (!config) return NextResponse.json({ error: 'Selected API model is unavailable.' }, { status: 404 });
+      const answer = await callRemoteLlm(config, `${systemPrompt}\n\nUser question: ${message}`);
+      return NextResponse.json({ answer, mode: 'remote', citations, retrievalMode });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Remote model request failed.' }, { status: 500 });
     }
-    const payload = await response.json();
-    const answer = extractResponseText(payload);
-    if (!answer) return NextResponse.json({ error: 'Remote model returned no readable text.' }, { status: 500 });
-    return NextResponse.json({ answer, mode: 'remote', citations, retrievalMode });
   }
 
   return NextResponse.json({
@@ -105,7 +82,7 @@ export async function POST(request: Request) {
             '',
             `User request: ${message}`,
             '',
-            'To enable full answers, install a local Ollama model from Settings or add OPENAI_API_KEY to .env.',
+            'To enable full answers, add a local Ollama model or save a cloud API model in Settings.',
           ].join('\n'),
     mode: 'demo',
     citations,

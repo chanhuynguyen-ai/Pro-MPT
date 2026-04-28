@@ -50,7 +50,7 @@ export default async function HomePage() {
               <div>
                 <div className="text-sm text-zinc-400">{dict.home.repositoryPreview}</div>
                 <div className="mt-1 text-lg font-semibold text-white">
-                  {preview ? `${preview.owner}/${preview.name}` : 'Seed the database to load a preview'}
+                  {preview ? `${preview.owner}/${preview.name}` : 'Create your first repository to preview it here'}
                 </div>
               </div>
               <span className="rounded-full border border-zinc-700 px-2 py-1 text-xs text-zinc-300">
@@ -85,7 +85,7 @@ export default async function HomePage() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-zinc-400">Run Prisma db push and seed once, then refresh the page.</p>
+              <p className="text-sm text-zinc-400">Your database is ready. Sign up, create a repository, and it will appear here.</p>
             )}
           </div>
         </div>
@@ -135,9 +135,11 @@ export default async function HomePage() {
           </Link>
         </div>
         <div className="grid gap-4">
-          {featured.map((repository) => (
+          {featured.length ? featured.map((repository) => (
             <RepositoryCard key={repository.id} repository={repository} />
-          ))}
+          )) : (
+            <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950 p-6 text-sm text-zinc-400">No public repositories yet. Create your first repo or sign in to publish one.</div>
+          )}
         </div>
       </section>
     </div>

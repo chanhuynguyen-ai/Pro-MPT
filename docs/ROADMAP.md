@@ -4,10 +4,10 @@
 This build closes most remaining MVP1 steps by adding:
 - storage abstraction layer
 - health endpoint
-- Docker deployment starter
+- Docker deployment real-use build
 - grounded retrieval already wired into repo chat and Crow-Chat
 
-## MVP2 starter now included
+## MVP2 real-use build now included
 - version compare page
 - Prompt Coach page
 

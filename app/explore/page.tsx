@@ -1,13 +1,28 @@
 import Link from 'next/link';
-import { RepositorySourceMode } from '@prisma/client';
-import { RepositoryCard } from '@/components/repository/repository-card';
-import { CATEGORY_OPTIONS, COMPATIBILITY_LABEL_TO_ENUM, REPOSITORY_SOURCE_MODES, SUPPORTED_MODEL_OPTIONS } from '@/lib/constants';
+import { CompatibilityTarget, RepositoryKind, RepositorySourceMode } from '@prisma/client';
+import { CATEGORY_OPTIONS } from '@/lib/constants';
 import { getCurrentUser } from '@/lib/auth';
 import { getExploreRepositories } from '@/lib/repositories';
+import { RepositoryCard } from '@/components/repository/repository-card';
 
-function readSearchParam(value: string | string[] | undefined, fallback: string) {
-  if (Array.isArray(value)) return value[0] ?? fallback;
-  return value ?? fallback;
+const kindTabs: Array<{ key: RepositoryKind; label: string; description: string }> = [
+  { key: 'PROMPT_TEXT', label: 'Prompt text', description: 'Prompt chữ cho tác vụ, phân tích và xử lý công việc.' },
+  { key: 'PROMPT_IMAGE', label: 'Prompt image', description: 'Prompt tạo ảnh, có preview repo ảnh và style đã tạo.' },
+  { key: 'SKILL', label: 'Skill', description: 'Tác tử nhiệm vụ chuyên biệt cho Claude / ChatGPT skill / workflow bot.' },
+];
+
+function resolveSourceMode(value?: string): RepositorySourceMode | 'ALL' {
+  return value === 'UPLOAD_BUNDLE' || value === 'MANUAL' ? value : 'ALL';
+}
+
+function resolveAi(value?: string): CompatibilityTarget | 'All models' {
+  return value === 'CHATGPT' || value === 'CLAUDE' || value === 'CLAUDE_CODE' || value === 'GEMINI' || value === 'ALL_MODELS'
+    ? value
+    : 'All models';
+}
+
+function resolveKind(value?: string): RepositoryKind {
+  return value === 'PROMPT_IMAGE' || value === 'SKILL' ? value : 'PROMPT_TEXT';
 }
 
 export default async function ExplorePage({
@@ -17,131 +32,104 @@ export default async function ExplorePage({
 }) {
   const viewer = await getCurrentUser();
   const resolved = (await searchParams) ?? {};
-  const q = readSearchParam(resolved.q, '');
-  const category = readSearchParam(resolved.category, 'All');
-  const aiLabel = readSearchParam(resolved.ai, 'All models');
-  const visibility = readSearchParam(resolved.visibility, 'public') as 'public' | 'all';
-  const source = readSearchParam(resolved.source, 'ALL') as RepositorySourceMode | 'ALL';
-  const aiEnum = aiLabel === 'All models' ? 'All models' : COMPATIBILITY_LABEL_TO_ENUM[aiLabel as keyof typeof COMPATIBILITY_LABEL_TO_ENUM];
+
+  const q = Array.isArray(resolved.q) ? resolved.q[0] : resolved.q;
+  const category = Array.isArray(resolved.category) ? resolved.category[0] : resolved.category;
+  const ai = resolveAi(Array.isArray(resolved.ai) ? resolved.ai[0] : resolved.ai);
+  const sourceMode = resolveSourceMode(Array.isArray(resolved.sourceMode) ? resolved.sourceMode[0] : resolved.sourceMode);
+  const kind = resolveKind(Array.isArray(resolved.kind) ? resolved.kind[0] : resolved.kind);
 
   const repositories = await getExploreRepositories({
     q,
-    category,
-    ai: aiEnum,
-    visibility,
-    sourceMode: source,
+    category: category && category !== 'All' ? category : undefined,
+    ai,
+    sourceMode,
+    kind,
+    visibility: viewer ? 'all' : 'public',
     viewerUserId: viewer?.id,
   });
 
-  const sourceSummary = source === 'ALL' ? 'all repository types' : source === 'MANUAL' ? 'web-authored prompt repos' : 'uploaded bundle repos';
+  const activeTab = kindTabs.find((item) => item.key === kind) ?? kindTabs[0];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-white">Explore prompt repositories</h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Discover public prompt skills by category, compatible AI, source mode, tags, popularity, and uploaded knowledge bundles.
-          </p>
+      <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-8">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-[0.3em] text-emerald-400">Explore</div>
+            <h1 className="mt-3 text-3xl font-semibold text-white">Khám phá repo theo 3 mảng riêng</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">Explore hiện được chia rõ thành Prompt text, Prompt image và Skill. Prompt image ưu tiên repo có ảnh mẫu, preview gallery và style hình ảnh; Skill là mảng tách riêng cho các tác tử chuyên biệt.</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-800 bg-black px-4 py-3 text-sm text-zinc-400">
+            <div className="font-medium text-white">Đang xem</div>
+            <div className="mt-1">{activeTab.label}</div>
+            <div className="mt-1 text-xs text-zinc-500">{activeTab.description}</div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/explore" className="rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-300 transition hover:border-zinc-600 hover:text-white">
-            Reset filters
-          </Link>
-          {['All', ...CATEGORY_OPTIONS].map((item) => {
-            const isActive = item === category;
+
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          {kindTabs.map((tab) => {
             const params = new URLSearchParams();
             if (q) params.set('q', q);
-            if (item !== 'All') params.set('category', item);
-            if (aiLabel !== 'All models') params.set('ai', aiLabel);
-            if (source !== 'ALL') params.set('source', source);
-            if (visibility !== 'public' && viewer) params.set('visibility', visibility);
+            if (category) params.set('category', category);
+            if (ai !== 'All models') params.set('ai', ai);
+            if (sourceMode !== 'ALL') params.set('sourceMode', sourceMode);
+            params.set('kind', tab.key);
+
             return (
               <Link
-                key={item}
-                href={`/explore${params.toString() ? `?${params.toString()}` : ''}`}
-                className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                  isActive
-                    ? 'border-blue-700 bg-blue-950/40 text-blue-200'
-                    : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:border-zinc-600 hover:text-white'
-                }`}
+                key={tab.key}
+                href={`/explore?${params.toString()}`}
+                className={`rounded-2xl border p-4 transition ${kind === tab.key ? 'border-emerald-700 bg-emerald-950/20' : 'border-zinc-800 bg-black hover:border-zinc-700'}`}
               >
-                {item}
+                <div className="text-base font-semibold text-white">{tab.label}</div>
+                <div className="mt-2 text-sm leading-6 text-zinc-400">{tab.description}</div>
               </Link>
             );
           })}
         </div>
       </div>
 
-      <form className="mb-6 grid gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 md:grid-cols-6">
-        <input name="q" defaultValue={q} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 md:col-span-2" placeholder="Search repositories, tags, owners, bundle files, or prompt text" />
-        <select name="category" defaultValue={category} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-sm text-white outline-none">
-          <option value="All">Category: All</option>
-          {CATEGORY_OPTIONS.map((item) => (
-            <option key={item} value={item}>Category: {item}</option>
-          ))}
-        </select>
-        <select name="source" defaultValue={source} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-sm text-white outline-none">
-          <option value="ALL">Source: All</option>
-          {REPOSITORY_SOURCE_MODES.map((mode) => (
-            <option key={mode.value} value={mode.value}>Source: {mode.label}</option>
-          ))}
-        </select>
-        <select name="visibility" defaultValue={visibility} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-sm text-white outline-none" disabled={!viewer}>
-          <option value="public">Visibility: Public</option>
-          <option value="all">Visibility: My public + private</option>
-        </select>
-        <div className="flex gap-3">
-          <select name="ai" defaultValue={aiLabel} className="min-w-0 flex-1 rounded-md border border-zinc-800 bg-black px-3 py-2 text-sm text-white outline-none">
-            {SUPPORTED_MODEL_OPTIONS.map((model) => (
-              <option key={model} value={model}>AI: {model}</option>
-            ))}
+      <form className="mt-8 grid gap-4 rounded-3xl border border-zinc-800 bg-zinc-950 p-6 lg:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+        <input type="hidden" name="kind" value={kind} />
+        <label className="grid gap-2 text-sm text-zinc-300">
+          Search
+          <input name="q" defaultValue={q} placeholder={kind === 'PROMPT_IMAGE' ? 'Search image prompt, style, visual tag...' : kind === 'SKILL' ? 'Search skill, agent, workflow...' : 'Search prompt, task, repo...'} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none" />
+        </label>
+        <label className="grid gap-2 text-sm text-zinc-300">
+          Category
+          <select name="category" defaultValue={category ?? 'All'} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none">
+            <option value="All">All</option>
+            {CATEGORY_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <button type="submit" className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500">Apply</button>
-        </div>
+        </label>
+        <label className="grid gap-2 text-sm text-zinc-300">
+          Model
+          <select name="ai" defaultValue={ai} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none">
+            <option value="All models">All models</option>
+            <option value="CHATGPT">ChatGPT</option>
+            <option value="CLAUDE">Claude</option>
+            <option value="CLAUDE_CODE">Claude Code</option>
+            <option value="GEMINI">Gemini</option>
+            <option value="ALL_MODELS">All models / universal</option>
+          </select>
+        </label>
+        <label className="grid gap-2 text-sm text-zinc-300">
+          Source
+          <select name="sourceMode" defaultValue={sourceMode} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none">
+            <option value="ALL">All</option>
+            <option value="MANUAL">Web prompt</option>
+            <option value="UPLOAD_BUNDLE">Uploaded bundle</option>
+          </select>
+        </label>
+        <button type="submit" className="mt-auto h-[42px] rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-500">Apply filters</button>
       </form>
 
-      <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-        <div className="mb-2 text-xs uppercase tracking-wide text-zinc-500">Current scope</div>
-        <p className="text-sm leading-6 text-zinc-300">
-          Showing results across <span className="font-semibold text-white">{sourceSummary}</span>{q ? <>, matching the query <span className="font-semibold text-white">{q}</span></> : ''}.
-        </p>
-      </div>
-
-      <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-        <div className="mb-3 text-xs uppercase tracking-wide text-zinc-500">Popular compatibility filters</div>
-        <div className="flex flex-wrap gap-2">
-          {SUPPORTED_MODEL_OPTIONS.map((model) => {
-            const params = new URLSearchParams();
-            if (q) params.set('q', q);
-            if (category !== 'All') params.set('category', category);
-            if (source !== 'ALL') params.set('source', source);
-            if (visibility !== 'public' && viewer) params.set('visibility', visibility);
-            if (model !== 'All models') params.set('ai', model);
-            const isActive = model === aiLabel;
-            return (
-              <Link
-                key={model}
-                href={`/explore${params.toString() ? `?${params.toString()}` : ''}`}
-                className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                  isActive
-                    ? 'border-emerald-700 bg-emerald-950/40 text-emerald-200'
-                    : 'border-emerald-900/60 bg-emerald-950/20 text-emerald-300 hover:border-emerald-700 hover:text-white'
-                }`}
-              >
-                {model}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="mb-4 text-sm text-zinc-400">Showing <span className="font-semibold text-white">{repositories.length}</span> repository results.</div>
-
-      <div className="grid gap-4">
+      <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {repositories.length ? repositories.map((repository) => <RepositoryCard key={repository.id} repository={repository} />) : (
-          <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950 p-8 text-sm text-zinc-400">
-            No repositories matched the current filters. Try searching a file name from an uploaded bundle, switching source mode, or clearing the AI filter.
+          <div className="md:col-span-2 xl:col-span-3 rounded-3xl border border-dashed border-zinc-800 bg-zinc-950 p-10 text-center text-zinc-400">
+            <div className="text-lg font-semibold text-white">No repositories found</div>
+            <p className="mt-3 text-sm leading-6">Try another keyword, switch the explore tab, or loosen the filters. Prompt image repos become more visible when they include image files and a style label.</p>
           </div>
         )}
       </div>

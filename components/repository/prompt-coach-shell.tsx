@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowUp, LoaderCircle, Sparkles } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
 
@@ -54,6 +55,8 @@ export function PromptCoachShell({ owner, slug }: { owner: string; slug: string 
   const [result, setResult] = useState<CoachResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+  const router = useRouter();
 
   const optimizationPack = useMemo(() => (result ? buildOptimizationPack(result) : ''), [result]);
 
@@ -76,6 +79,36 @@ export function PromptCoachShell({ owner, slug }: { owner: string; slug: string 
     }
   }
 
+
+  async function applyOptimizerAsVersion() {
+    if (!result) return;
+    setApplying(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/repositories/${owner}/${slug}/coach/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          optimizedSystemPrompt: result.optimizedSystemPrompt,
+          optimizedUserTemplate: result.optimizedUserTemplate,
+          suggestedVariables: result.suggestedVariables,
+          suggestedOutputFormat: result.suggestedOutputFormat,
+          suggestedNotes: result.suggestedNotes,
+          changelog: 'Applied Prompt Optimizer recommendations as a new version.',
+          bumpType: 'patch',
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || 'Could not apply optimizer result.');
+      router.push(payload.redirectTo || `/repositories/${owner}/${slug}`);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not apply optimizer result.');
+    } finally {
+      setApplying(false);
+    }
+  }
+
   const quickGoals = [
     'Tighten the system prompt and make the scope safer.',
     'Rewrite the user template so it is easier to reuse.',
@@ -93,7 +126,14 @@ export function PromptCoachShell({ owner, slug }: { owner: string; slug: string 
             </div>
             <p className="text-sm leading-6 text-zinc-400">MVP2 upgrade. Ask Crow to critique this repo, rewrite the prompt pack, improve grounded behavior, and suggest the next bundle documents to add.</p>
           </div>
-          {result ? <CopyButton text={optimizationPack} label="Copy optimizer pack" copiedLabel="Optimizer pack copied" /> : null}
+          {result ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={applyOptimizerAsVersion} disabled={applying} className="rounded-md border border-emerald-700 bg-emerald-950/30 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">
+                  {applying ? 'Applying…' : 'Apply as new version'}
+                </button>
+                <CopyButton text={optimizationPack} label="Copy optimizer pack" copiedLabel="Optimizer pack copied" />
+              </div>
+            ) : null}
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">

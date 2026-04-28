@@ -1,6 +1,7 @@
-import { downloadLocalModelsAction } from '@/app/actions/settings-actions';
+import { deleteLocalModelAction, downloadLocalModelsAction } from '@/app/actions/settings-actions';
 import { SubmitButton } from '@/components/ui/submit-button';
 import type { LocalInstalledModel, LocalModelRecommendation, OllamaStatus } from '@/lib/ollama';
+import { X } from 'lucide-react';
 
 function formatTimestamp(value: string | null) {
   if (!value) return '—';
@@ -16,16 +17,24 @@ function InstalledModelList({ models }: { models: LocalInstalledModel[] }) {
     <div className="space-y-3">
       {models.map((model) => (
         <div key={model.name} className="rounded-xl border border-zinc-800 bg-black px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="font-medium text-white">{model.name}</div>
+              <div className="font-medium text-white">{model.name} <span className="text-zinc-500">• local</span></div>
               <div className="mt-1 text-xs text-zinc-500">
                 {model.parameterSize ?? 'Unknown size'} • {model.quantization ?? 'Unknown quantization'}
               </div>
             </div>
-            <div className="text-right text-xs text-zinc-500">
-              <div>{model.sizeLabel}</div>
-              <div>{formatTimestamp(model.modifiedAt)}</div>
+            <div className="flex items-start gap-3">
+              <div className="text-right text-xs text-zinc-500">
+                <div>{model.sizeLabel}</div>
+                <div>{formatTimestamp(model.modifiedAt)}</div>
+              </div>
+              <form action={deleteLocalModelAction}>
+                <input type="hidden" name="model" value={model.name} />
+                <button type="submit" className="rounded-md border border-rose-900/60 bg-rose-950/20 p-2 text-rose-300 hover:bg-rose-950/40" aria-label={`Delete ${model.name}`}>
+                  <X className="h-4 w-4" />
+                </button>
+              </form>
             </div>
           </div>
         </div>
@@ -108,7 +117,7 @@ export function LocalModelSettingsCard({
             {status.runningModels.length ? (
               <div className="flex flex-wrap gap-2">
                 {status.runningModels.map((model) => (
-                  <span key={model} className="rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1 text-xs text-zinc-300">{model}</span>
+                  <span key={model} className="rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1 text-xs text-zinc-300">{model} • local</span>
                 ))}
               </div>
             ) : (

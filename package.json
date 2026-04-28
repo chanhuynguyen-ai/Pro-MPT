@@ -11,7 +11,8 @@
     "prisma:dbpush": "prisma db push",
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "reset:local-data": "node scripts/reset-local-data.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

@@ -27,6 +27,13 @@ type WorkspaceOption = {
   label: string;
 };
 
+type ModelOption = {
+  id: string;
+  label: string;
+  kind: 'local' | 'api';
+  value: string;
+};
+
 type CrowChatShellProps = {
   labels: {
     title: string;
@@ -57,11 +64,11 @@ type CrowChatShellProps = {
   repoOptions: RepoOption[];
   workspaceOptions: WorkspaceOption[];
   starredRepos: Array<{ id: string; href: string; label: string; sourceModeLabel: string }>;
-  installedModels: string[];
+  modelOptions: ModelOption[];
   defaultMode: 'local' | 'remote' | 'demo';
 };
 
-export function CrowChatShell({ labels, repoOptions, workspaceOptions, starredRepos, installedModels, defaultMode }: CrowChatShellProps) {
+export function CrowChatShell({ labels, repoOptions, workspaceOptions, starredRepos, modelOptions, defaultMode }: CrowChatShellProps) {
   const [messages, setMessages] = useState<CrowChatMessage[]>([
     {
       id: 'welcome',
@@ -71,22 +78,24 @@ export function CrowChatShell({ labels, repoOptions, workspaceOptions, starredRe
         defaultMode === 'local'
           ? 'Crow-Chat is ready with your local model stack. Choose a repo or workspace library and start asking.'
           : defaultMode === 'remote'
-            ? 'Crow-Chat is ready with the remote model fallback. Choose a repo or workspace library and ask anything.'
-            : 'No live model is configured yet. Add local Ollama models or OPENAI_API_KEY to enable full chat.',
+            ? 'Crow-Chat is ready with your saved API model. Choose a repo or workspace library and ask anything.'
+            : 'No live model is configured yet. Add a local Ollama model or save a remote API model in Settings to enable full chat.',
     },
   ]);
   const [input, setInput] = useState('');
   const [selectedRepoId, setSelectedRepoId] = useState(repoOptions[0]?.id ?? '');
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
-  const [selectedModel, setSelectedModel] = useState(installedModels[0] ?? '');
+  const [selectedModelId, setSelectedModelId] = useState(modelOptions[0]?.id ?? '');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const selectedModel = useMemo(() => modelOptions.find((item) => item.id === selectedModelId) || null, [modelOptions, selectedModelId]);
   const canSend = !!input.trim() && !isSending;
   const modeBadge = useMemo(() => {
-    if (selectedModel) return labels.localMode;
-    return defaultMode === 'remote' ? labels.remoteMode : labels.noModels;
-  }, [defaultMode, labels.localMode, labels.noModels, labels.remoteMode, selectedModel]);
+    if (selectedModel?.kind === 'local') return labels.localMode;
+    if (selectedModel?.kind === 'api') return labels.remoteMode;
+    return labels.noModels;
+  }, [labels.localMode, labels.noModels, labels.remoteMode, selectedModel]);
 
   function resetChat() {
     setMessages((current) => [current[0]]);
@@ -107,7 +116,13 @@ export function CrowChatShell({ labels, repoOptions, workspaceOptions, starredRe
       const response = await fetch('/api/crow-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, repositoryId: selectedWorkspaceId ? null : selectedRepoId || null, workspaceId: selectedWorkspaceId || null, model: selectedModel || null }),
+        body: JSON.stringify({
+          message,
+          repositoryId: selectedWorkspaceId ? null : selectedRepoId || null,
+          workspaceId: selectedWorkspaceId || null,
+          modelKind: selectedModel?.kind || null,
+          modelValue: selectedModel?.value || null,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || 'Crow-Chat request failed.');
@@ -127,7 +142,7 @@ export function CrowChatShell({ labels, repoOptions, workspaceOptions, starredRe
             <h1 className="text-3xl font-semibold text-white">{labels.title}</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">{labels.subtitle}</p>
           </div>
-          <div className={`rounded-full px-3 py-1 text-xs font-semibold ${selectedModel ? 'border border-emerald-800 bg-emerald-950/30 text-emerald-300' : 'border border-amber-800 bg-amber-950/30 text-amber-300'}`}>{modeBadge}</div>
+          <div className={`rounded-full px-3 py-1 text-xs font-semibold ${selectedModel?.kind === 'local' ? 'border border-emerald-800 bg-emerald-950/30 text-emerald-300' : selectedModel?.kind === 'api' ? 'border border-blue-800 bg-blue-950/30 text-blue-300' : 'border border-amber-800 bg-amber-950/30 text-amber-300'}`}>{modeBadge}</div>
         </div>
 
         <div className="space-y-4 rounded-2xl border border-zinc-800 bg-black p-4">
@@ -167,9 +182,9 @@ export function CrowChatShell({ labels, repoOptions, workspaceOptions, starredRe
               </label>
               <label className="grid gap-2 text-sm text-zinc-300">
                 <span>{labels.llmModel}</span>
-                <select value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none">
+                <select value={selectedModelId} onChange={(event) => setSelectedModelId(event.target.value)} className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none">
                   <option value="">{labels.noModels}</option>
-                  {installedModels.map((model) => <option key={model} value={model}>{model}</option>)}
+                  {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
                 </select>
               </label>
               <button type="button" onClick={submitMessage} disabled={!canSend} className="inline-flex h-[42px] items-center justify-center self-end rounded-md bg-emerald-600 px-4 text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60" aria-label={labels.send}><ArrowUp className="h-4 w-4" /></button>

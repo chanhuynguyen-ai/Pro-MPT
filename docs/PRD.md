@@ -3,8 +3,8 @@
 ## 1. Product name
 Prompt-Hub
 
-## Implementation note for this starter
-This repository now implements a demo subset of MVP1 with Prisma + SQLite for: create repository, create initial version, persist compatible AI targets, explore filters, dashboard reads, profile reads, and repository detail reads. Authentication, publish-new-version UI, clone, star, and download remain planned but not yet wired.
+## Implementation note for this real-use build
+This repository now implements a real subset of MVP1 with Prisma + SQLite for: create repository, create initial version, persist compatible AI targets, explore filters, dashboard reads, profile reads, and repository detail reads. Authentication, publish-new-version UI, clone, star, and download remain planned but not yet wired.
 
 ## 2. Product one-liner
 A Git-inspired platform for storing, versioning, cloning, and sharing prompt repositories and prompt skills.

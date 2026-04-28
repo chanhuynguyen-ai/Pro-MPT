@@ -26,13 +26,13 @@ export default async function SignInPage({
   return (
     <AuthShell
       title="Sign in to Prompt-Hub"
-      description="Access your private repositories, publish prompt versions, and manage ownership with a real account session."
+      description="Use your real account to manage private repositories, upload knowledge bundles, and work with Crow-Chat on your own data."
       altHref={`/sign-up?next=${encodeURIComponent(next)}`}
       altLabel="Don't have an account?"
       altCta="Create one"
     >
       <h2 className="text-2xl font-semibold text-white">Welcome back</h2>
-      <p className="mt-2 text-sm text-zinc-400">Use one of the demo seeded accounts or a new account you created here.</p>
+      <p className="mt-2 text-sm text-zinc-400">Sign in with the account you created for your own Prompt-Hub workspace.</p>
 
       {error ? (
         <div className="mt-6 rounded-xl border border-rose-900/60 bg-rose-950/30 p-4 text-sm text-rose-200">
@@ -45,7 +45,7 @@ export default async function SignInPage({
         <input type="hidden" name="next" value={next} />
         <label className="grid gap-2 text-sm text-zinc-300">
           Email
-          <input name="email" type="email" required className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none" placeholder="hungdev@example.com" />
+          <input name="email" type="email" required className="rounded-md border border-zinc-800 bg-black px-3 py-2 text-white outline-none" placeholder="you@example.com" />
         </label>
         <label className="grid gap-2 text-sm text-zinc-300">
           Password
@@ -55,9 +55,10 @@ export default async function SignInPage({
       </form>
 
       <div className="mt-6 rounded-2xl border border-zinc-800 bg-black p-4 text-sm text-zinc-400">
-        <div className="font-medium text-zinc-200">Demo login</div>
-        <div className="mt-2">Email: <span className="text-zinc-300">hungdev@example.com</span></div>
-        <div>Password: <span className="text-zinc-300">prompt1234</span></div>
+        <div className="font-medium text-zinc-200">First time here?</div>
+        <div className="mt-2 leading-6">
+          Create a real account on the sign-up page, then sign in and build your first repository with your own data. No demo account is required.
+        </div>
       </div>
 
       <div className="mt-6 text-sm text-zinc-500">

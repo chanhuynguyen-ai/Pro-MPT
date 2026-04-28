@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { TEXT_PREVIEW_EXTENSIONS } from '@/lib/constants';
+import { REPOSITORY_KIND_LABELS, TEXT_PREVIEW_EXTENSIONS } from '@/lib/constants';
 
 export function slugify(value: string) {
   return value
@@ -55,6 +55,10 @@ export function isProbablyTextFile(fileName: string, mimeType?: string | null) {
   return TEXT_PREVIEW_EXTENSIONS.includes(ext as (typeof TEXT_PREVIEW_EXTENSIONS)[number]);
 }
 
+export function isImageMimeType(mimeType?: string | null) {
+  return Boolean(mimeType && mimeType.startsWith('image/'));
+}
+
 export function extractTextPreview(buffer: Buffer, maxBytes = 20 * 1024) {
   return buffer
     .subarray(0, Math.min(maxBytes, buffer.length))
@@ -71,4 +75,8 @@ export function formatBytes(bytes: number) {
 
 export function getSourceModeLabel(mode: 'MANUAL' | 'UPLOAD_BUNDLE') {
   return mode === 'UPLOAD_BUNDLE' ? 'Uploaded bundle' : 'Web prompt';
+}
+
+export function getRepositoryKindLabel(kind: 'PROMPT_TEXT' | 'PROMPT_IMAGE' | 'SKILL') {
+  return REPOSITORY_KIND_LABELS[kind];
 }

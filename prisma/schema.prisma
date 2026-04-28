@@ -25,6 +25,23 @@ enum RepositorySourceMode {
   UPLOAD_BUNDLE
 }
 
+enum RepositoryKind {
+  PROMPT_TEXT
+  PROMPT_IMAGE
+  SKILL
+}
+
+enum LlmProvider {
+  GEMINI
+  OPENAI
+}
+
+enum ReviewStatus {
+  REVIEWED
+  WARNING
+  BLOCKED
+}
+
 model User {
   id              String              @id @default(cuid())
   name            String
@@ -40,6 +57,7 @@ model User {
   downloads       Download[]
   sessions        Session[]
   workspaces      Workspace[]
+  llmConfigs      UserLlmConfig[]
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 }
@@ -66,37 +84,46 @@ model Category {
 }
 
 model Repository {
-  id                String                     @id @default(cuid())
-  ownerId           String
-  categoryId        String
-  name              String
-  slug              String
-  description       String
+  id                   String               @id @default(cuid())
+  ownerId              String
+  categoryId           String
+  name                 String
+  slug                 String
+  description          String
+  kind                 RepositoryKind       @default(PROMPT_TEXT)
+  imageStyle           String?
   customModelNamesJson String?
-  visibility        Visibility                 @default(PUBLIC)
-  sourceMode        RepositorySourceMode       @default(MANUAL)
-  latestVersionId   String?                    @unique
-  starsCount        Int                        @default(0)
-  clonesCount       Int                        @default(0)
-  downloadsCount    Int                        @default(0)
-  owner             User                       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  category          Category                   @relation(fields: [categoryId], references: [id])
-  versions          RepositoryVersion[]        @relation("RepositoryVersions")
-  latestVersion     RepositoryVersion?         @relation("LatestRepositoryVersion", fields: [latestVersionId], references: [id])
-  tags              RepositoryTag[]
-  compatibility     RepositoryCompatibility[]
-  assets            RepositoryAsset[]
-  chunks            RepositoryChunk[]
-  stars             Star[]
-  sourceClones      Clone[]                    @relation("SourceRepository")
-  derivedClones     Clone[]                    @relation("ClonedRepository")
-  downloads         Download[]
-  workspaceLinks    WorkspaceRepository[]
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
+  visibility           Visibility           @default(PUBLIC)
+  sourceMode           RepositorySourceMode @default(MANUAL)
+  reviewStatus         ReviewStatus         @default(REVIEWED)
+  reviewScore          Int                  @default(0)
+  reviewSummary        String?
+  reviewFlagsJson      String?
+  reviewDetailsJson    String?
+  reviewedAt           DateTime?
+  latestVersionId      String?              @unique
+  starsCount           Int                  @default(0)
+  clonesCount          Int                  @default(0)
+  downloadsCount       Int                  @default(0)
+  owner                User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  category             Category             @relation(fields: [categoryId], references: [id])
+  versions             RepositoryVersion[]  @relation("RepositoryVersions")
+  latestVersion        RepositoryVersion?   @relation("LatestRepositoryVersion", fields: [latestVersionId], references: [id])
+  tags                 RepositoryTag[]
+  compatibility        RepositoryCompatibility[]
+  assets               RepositoryAsset[]
+  chunks               RepositoryChunk[]
+  stars                Star[]
+  sourceClones         Clone[]              @relation("SourceRepository")
+  derivedClones        Clone[]              @relation("ClonedRepository")
+  downloads            Download[]
+  workspaceLinks       WorkspaceRepository[]
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
 
   @@unique([ownerId, slug])
   @@index([categoryId])
+  @@index([kind])
 }
 
 model RepositoryVersion {
@@ -124,37 +151,37 @@ model RepositoryVersion {
 }
 
 model RepositoryAsset {
-  id           String            @id @default(cuid())
+  id           String          @id @default(cuid())
   repositoryId String
   originalName String
   relativePath String?
   storagePath  String
   mimeType     String?
   sizeBytes    Int
-  isText       Boolean           @default(false)
+  isText       Boolean         @default(false)
   previewText  String?
-  repository   Repository        @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  repository   Repository      @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   chunks       RepositoryChunk[]
-  createdAt    DateTime          @default(now())
+  createdAt    DateTime        @default(now())
 
   @@index([repositoryId])
 }
 
 model RepositoryChunk {
-  id           String             @id @default(cuid())
-  repositoryId String
-  assetId      String?
-  versionId    String?
-  sourceType   String
-  title        String
-  content      String
-  contentHash  String
+  id            String             @id @default(cuid())
+  repositoryId  String
+  assetId       String?
+  versionId     String?
+  sourceType    String
+  title         String
+  content       String
+  contentHash   String
   embeddingJson String?
-  repository   Repository         @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  asset        RepositoryAsset?   @relation(fields: [assetId], references: [id], onDelete: SetNull)
-  version      RepositoryVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  repository    Repository         @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  asset         RepositoryAsset?   @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  version       RepositoryVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   @@index([repositoryId])
   @@index([assetId])
@@ -188,6 +215,22 @@ model RepositoryCompatibility {
   @@index([target])
 }
 
+model UserLlmConfig {
+  id        String      @id @default(cuid())
+  userId    String
+  provider  LlmProvider
+  label     String?
+  apiKey    String
+  model     String
+  baseUrl   String?
+  isEnabled Boolean     @default(true)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId])
+  @@unique([userId, provider, model])
+}
 
 model Workspace {
   id          String                @id @default(cuid())
@@ -206,9 +249,9 @@ model Workspace {
 model WorkspaceRepository {
   workspaceId  String
   repositoryId String
-  workspace    Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  addedAt      DateTime    @default(now())
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  addedAt      DateTime   @default(now())
 
   @@id([workspaceId, repositoryId])
   @@index([repositoryId])
@@ -231,10 +274,10 @@ model Clone {
   sourceRepositoryId String
   clonedRepositoryId String
   userId             String
+  createdAt          DateTime   @default(now())
   sourceRepository   Repository @relation("SourceRepository", fields: [sourceRepositoryId], references: [id], onDelete: Cascade)
   clonedRepository   Repository @relation("ClonedRepository", fields: [clonedRepositoryId], references: [id], onDelete: Cascade)
   user               User       @relation("CloneActor", fields: [userId], references: [id], onDelete: Cascade)
-  createdAt          DateTime   @default(now())
 
   @@index([sourceRepositoryId])
   @@index([clonedRepositoryId])
@@ -246,9 +289,9 @@ model Download {
   repositoryId String
   userId       String?
   format       String
+  createdAt    DateTime   @default(now())
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt    DateTime   @default(now())
 
   @@index([repositoryId])
   @@index([userId])

@@ -1,5 +1,9 @@
 node_modules
 .next
 .env
+.env.local
 .prisma
 *.log
+storage
+prisma/dev.db
+tsconfig.tsbuildinfo

@@ -1,7 +1,7 @@
-import { CompatibilityTarget, Prisma, RepositorySourceMode, Visibility } from '@prisma/client';
+import { CompatibilityTarget, Prisma, RepositoryKind, RepositorySourceMode, ReviewStatus, Visibility } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { COMPATIBILITY_ENUM_TO_LABEL } from '@/lib/constants';
-import { formatBytes, formatDate, getSourceModeLabel } from '@/lib/utils';
+import { formatBytes, formatDate, getRepositoryKindLabel, getSourceModeLabel, isImageMimeType } from '@/lib/utils';
 
 export type RepositoryAssetModel = {
   id: string;
@@ -12,9 +12,24 @@ export type RepositoryAssetModel = {
   sizeLabel: string;
   isText: boolean;
   previewText: string | null;
+  isImage: boolean;
+};
+
+export type RepositoryReviewDetail = {
+  id: string;
+  title: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  score: number;
+  snippets: string[];
+  description: string;
 };
 
 export type RepositoryCardModel = {
+  reviewStatus: 'REVIEWED' | 'WARNING' | 'BLOCKED';
+  reviewScore: number;
+  reviewSummary: string;
+  reviewFlags: string[];
+  reviewDetails: RepositoryReviewDetail[];
   id: string;
   owner: string;
   ownerDisplayName: string;
@@ -22,6 +37,10 @@ export type RepositoryCardModel = {
   slug: string;
   description: string;
   category: string;
+  kind: 'PROMPT_TEXT' | 'PROMPT_IMAGE' | 'SKILL';
+  kindLabel: string;
+  imageStyle: string | null;
+  previewImages: { id: string; url: string; alt: string }[];
   supportedModels: string[];
   customSupportedModels: string[];
   tags: string[];
@@ -65,6 +84,8 @@ export type RepositoryEditorModel = {
   slug: string;
   description: string;
   categorySlug: string;
+  kind: 'PROMPT_TEXT' | 'PROMPT_IMAGE' | 'SKILL';
+  imageStyle: string;
   visibility: 'PUBLIC' | 'PRIVATE';
   sourceMode: 'MANUAL' | 'UPLOAD_BUNDLE';
   tags: string[];
@@ -87,6 +108,7 @@ export type RepositoryCollectionFilters = {
   ai?: CompatibilityTarget | 'All models';
   visibility?: 'public' | 'all';
   sourceMode?: RepositorySourceMode | 'ALL';
+  kind?: RepositoryKind | 'ALL';
   viewerUserId?: string;
 };
 
@@ -120,17 +142,48 @@ function mapAsset(asset: {
     sizeLabel: formatBytes(asset.sizeBytes),
     isText: asset.isText,
     previewText: asset.previewText,
+    isImage: isImageMimeType(asset.mimeType),
   };
 }
 
-function parseCustomModelNames(raw?: string | null) {
+function parseJsonArray(raw?: string | null) {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map((item) => String(item).trim()).filter(Boolean) : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
+}
+
+function parseStringArray(raw?: string | null) {
+  return parseJsonArray(raw).map((item) => String(item).trim()).filter(Boolean);
+}
+
+function parseReviewDetails(raw?: string | null): RepositoryReviewDetail[] {
+  return parseJsonArray(raw).map((item) => ({
+    id: String(item?.id || ''),
+    title: String(item?.title || ''),
+    severity: ['low', 'medium', 'high', 'critical'].includes(String(item?.severity)) ? item.severity : 'medium',
+    score: Number(item?.score || 0),
+    snippets: Array.isArray(item?.snippets) ? item.snippets.map((value: unknown) => String(value)) : [],
+    description: String(item?.description || ''),
+  }));
+}
+
+function buildPreviewImages(
+  owner: string,
+  slug: string,
+  assets?: { id: string; originalName: string; relativePath: string | null; mimeType: string | null }[],
+) {
+  return (assets || [])
+    .filter((asset) => isImageMimeType(asset.mimeType))
+    .slice(0, 3)
+    .map((asset) => ({
+      id: asset.id,
+      url: `/repositories/${owner}/${slug}/preview/${asset.id}`,
+      alt: asset.relativePath || asset.originalName,
+    }));
 }
 
 function mapRepositoryBase(repository: {
@@ -138,6 +191,8 @@ function mapRepositoryBase(repository: {
   name: string;
   slug: string;
   description: string;
+  kind: RepositoryKind;
+  imageStyle?: string | null;
   visibility: Visibility;
   sourceMode: RepositorySourceMode;
   starsCount: number;
@@ -149,8 +204,15 @@ function mapRepositoryBase(repository: {
   tags: { tag: { name: string } }[];
   compatibility: { target: CompatibilityTarget }[];
   customModelNamesJson?: string | null;
-  assets?: { id: string }[];
+  reviewStatus?: ReviewStatus;
+  reviewScore?: number | null;
+  reviewSummary?: string | null;
+  reviewFlagsJson?: string | null;
+  reviewDetailsJson?: string | null;
+  assets?: { id: string; originalName: string; relativePath: string | null; mimeType: string | null }[];
 }): RepositoryCardModel {
+  const reviewFlags = parseStringArray(repository.reviewFlagsJson);
+  const reviewDetails = parseReviewDetails(repository.reviewDetailsJson);
   return {
     id: repository.id,
     owner: repository.owner.username,
@@ -159,8 +221,17 @@ function mapRepositoryBase(repository: {
     slug: repository.slug,
     description: repository.description,
     category: repository.category.name,
-    supportedModels: [...toSupportedModels(repository.compatibility), ...parseCustomModelNames(repository.customModelNamesJson)],
-    customSupportedModels: parseCustomModelNames(repository.customModelNamesJson),
+    kind: repository.kind,
+    kindLabel: getRepositoryKindLabel(repository.kind),
+    imageStyle: repository.imageStyle ?? null,
+    previewImages: buildPreviewImages(repository.owner.username, repository.slug, repository.assets),
+    reviewStatus: (repository.reviewStatus ?? 'REVIEWED') as 'REVIEWED' | 'WARNING' | 'BLOCKED',
+    reviewScore: repository.reviewScore ?? 0,
+    reviewSummary: repository.reviewSummary ?? 'Đã kiểm duyệt: không phát hiện rủi ro rõ ràng trong nội dung repo.',
+    reviewFlags,
+    reviewDetails,
+    supportedModels: [...toSupportedModels(repository.compatibility), ...parseStringArray(repository.customModelNamesJson)],
+    customSupportedModels: parseStringArray(repository.customModelNamesJson),
     tags: repository.tags.map((item) => item.tag.name),
     visibility: toVisibilityLabel(repository.visibility),
     sourceMode: repository.sourceMode,
@@ -178,7 +249,7 @@ const baseInclude = {
   category: { select: { name: true } },
   tags: { include: { tag: { select: { name: true } } } },
   compatibility: { select: { target: true } },
-  assets: { select: { id: true } },
+  assets: { select: { id: true, originalName: true, relativePath: true, mimeType: true } },
 } satisfies Prisma.RepositoryInclude;
 
 function buildRepositorySearchWhere(q?: string): Prisma.RepositoryWhereInput | undefined {
@@ -190,6 +261,7 @@ function buildRepositorySearchWhere(q?: string): Prisma.RepositoryWhereInput | u
       { name: { contains: query } },
       { description: { contains: query } },
       { slug: { contains: query } },
+      { imageStyle: { contains: query } },
       { owner: { username: { contains: query } } },
       { owner: { name: { contains: query } } },
       { tags: { some: { tag: { name: { contains: query } } } } },
@@ -229,6 +301,10 @@ function buildCollectionWhere(filters: RepositoryCollectionFilters): Prisma.Repo
 
   if (filters.sourceMode && filters.sourceMode !== 'ALL') {
     andClauses.push({ sourceMode: filters.sourceMode });
+  }
+
+  if (filters.kind && filters.kind !== 'ALL') {
+    andClauses.push({ kind: filters.kind });
   }
 
   if (filters.ai && filters.ai !== 'All models') {
@@ -332,7 +408,7 @@ export async function getRepositoryDetail(owner: string, slug: string, viewerUse
       category: { select: { name: true } },
       tags: { include: { tag: { select: { name: true } } } },
       compatibility: { select: { target: true } },
-          assets: {
+      assets: {
         orderBy: [{ createdAt: 'asc' }],
         select: { id: true, originalName: true, relativePath: true, mimeType: true, sizeBytes: true, isText: true, previewText: true },
       },
@@ -420,11 +496,13 @@ export async function getRepositoryEditorData(repositoryId: string, viewerUserId
     slug: repository.slug,
     description: repository.description,
     categorySlug: repository.category.slug,
+    kind: repository.kind,
+    imageStyle: repository.imageStyle ?? '',
     visibility: repository.visibility,
     sourceMode: repository.sourceMode,
     tags: repository.tags.map((item) => item.tag.name),
-    supportedModels: [...toSupportedModels(repository.compatibility), ...parseCustomModelNames(repository.customModelNamesJson)],
-    customSupportedModels: parseCustomModelNames(repository.customModelNamesJson),
+    supportedModels: [...toSupportedModels(repository.compatibility), ...parseStringArray(repository.customModelNamesJson)],
+    customSupportedModels: parseStringArray(repository.customModelNamesJson),
     assets: repository.assets.map(mapAsset),
     latestVersion: {
       version: repository.latestVersion.versionNumber,
@@ -456,7 +534,6 @@ export async function getExploreRepositories(filters: RepositoryCollectionFilter
   return rows.map(mapRepositoryBase);
 }
 
-
 export type RepositoryCompareData = {
   id: string;
   owner: string;
@@ -475,7 +552,7 @@ export type RepositoryCompareData = {
   }[];
 };
 
-export async function getRepositoryCompareData(owner: string, slug: string, viewerUserId?: string) : Promise<RepositoryCompareData | null> {
+export async function getRepositoryCompareData(owner: string, slug: string, viewerUserId?: string): Promise<RepositoryCompareData | null> {
   const repository = await prisma.repository.findFirst({
     where: { slug, owner: { username: owner } },
     include: {
